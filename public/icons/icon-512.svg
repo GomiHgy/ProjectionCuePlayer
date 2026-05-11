@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Projection Cue Player icon">
+  <rect width="512" height="512" rx="96" fill="#181713"/>
+  <rect x="74" y="108" width="364" height="230" rx="28" fill="#050505" stroke="#7bd88f" stroke-width="22"/>
+  <path d="M210 168 L334 224 L210 280 Z" fill="#7bd88f"/>
+  <rect x="140" y="382" width="232" height="28" rx="14" fill="#f7f3ea"/>
+</svg>

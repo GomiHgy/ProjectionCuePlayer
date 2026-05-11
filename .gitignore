@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vite-dev*.log
+.vite-dev*.err
+public/vosk/*.zip
+public/vosk/_work/
