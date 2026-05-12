@@ -516,6 +516,24 @@ video {
   font-weight: 800;
 }
 
+.fullscreenHint {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  z-index: 4;
+  transform: translateX(-50%);
+  max-width: min(92vw, 560px);
+  padding: 12px 18px;
+  border: 1px solid rgba(247, 243, 234, 0.32);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--text);
+  font-size: clamp(1rem, 2.2vw, 1.45rem);
+  font-weight: 900;
+  text-align: center;
+  pointer-events: none;
+}
+
 .previewStage:fullscreen {
   display: grid;
   width: 100vw;

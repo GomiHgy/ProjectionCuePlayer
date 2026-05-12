@@ -151,6 +151,7 @@ function App() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showFullscreenHint, setShowFullscreenHint] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [wakeWordDraft, setWakeWordDraft] = useState("");
   const [voskCacheStatus, setVoskCacheStatus] = useState<"checking" | "not-cached" | "downloading" | "cached" | "error">(
@@ -173,6 +174,7 @@ function App() {
   const delayTimeoutRef = useRef<number | null>(null);
   const delayIntervalRef = useRef<number | null>(null);
   const voiceRecoverTimeoutRef = useRef<number | null>(null);
+  const fullscreenHintTimeoutRef = useRef<number | null>(null);
   const voiceServiceRef = useRef<VoiceTriggerService>(createVoiceTriggerService());
 
   const statusLabel = STATUS_LABELS[cueState];
@@ -379,6 +381,7 @@ function App() {
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
+        setShowFullscreenHint(false);
         return;
       }
 
@@ -387,6 +390,14 @@ function App() {
       }
 
       await stageRef.current.requestFullscreen();
+      setShowFullscreenHint(true);
+      if (fullscreenHintTimeoutRef.current !== null) {
+        window.clearTimeout(fullscreenHintTimeoutRef.current);
+      }
+      fullscreenHintTimeoutRef.current = window.setTimeout(() => {
+        fullscreenHintTimeoutRef.current = null;
+        setShowFullscreenHint(false);
+      }, 2000);
     } catch {
       setCueState("error");
       setErrorMessage("フルスクリーンを開始できませんでした。ブラウザの許可や表示先を確認してください。");
@@ -648,12 +659,20 @@ function App() {
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      const nextIsFullscreen = Boolean(document.fullscreenElement);
+      setIsFullscreen(nextIsFullscreen);
+      if (!nextIsFullscreen) {
+        setShowFullscreenHint(false);
+      }
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      if (fullscreenHintTimeoutRef.current !== null) {
+        window.clearTimeout(fullscreenHintTimeoutRef.current);
+        fullscreenHintTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -1007,6 +1026,12 @@ function App() {
                 <span>{selectedFile ? "動画選択済み" : "動画未選択"}</span>
                 <span>{settings.mirror ? "左右反転 ON" : "左右反転 OFF"}</span>
                 <span>{settings.objectFit}</span>
+              </div>
+            ) : null}
+
+            {showFullscreenHint ? (
+              <div className="fullscreenHint" aria-live="polite">
+                Escキーでフルスクリーンを解除できます
               </div>
             ) : null}
           </div>
