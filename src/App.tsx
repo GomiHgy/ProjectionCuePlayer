@@ -10,6 +10,7 @@ import {
 } from "./services/voiceTrigger";
 
 const SETTINGS_KEY = "projection-cue-player.settings.v1";
+const APP_VERSION = "v0.1.0";
 
 const DEFAULT_SETTINGS: AppSettings = {
   delaySeconds: 0,
@@ -93,9 +94,66 @@ function formatBytes(size: number): string {
   return `${(size / 1000 / 1000).toFixed(1)} MB`;
 }
 
+type CachedVoskModel = {
+  cacheName: string;
+  response: Response;
+};
+
+function getVoskModelUrl(): string {
+  return new URL(VOSK_MODEL_URL, window.location.href).href;
+}
+
+function isVoskModelRequest(request: Request): boolean {
+  const modelFileName = VOSK_MODEL_URL.split("/").at(-1);
+  if (!modelFileName) {
+    return false;
+  }
+
+  return new URL(request.url).pathname.endsWith(`/${modelFileName}`);
+}
+
+async function findCachedVoskModel(): Promise<CachedVoskModel | null> {
+  const absoluteVoskModelUrl = getVoskModelUrl();
+  const cacheNames = await caches.keys();
+  const orderedCacheNames = [
+    VOSK_MODEL_CACHE_NAME,
+    ...cacheNames.filter((cacheName) => cacheName !== VOSK_MODEL_CACHE_NAME),
+  ];
+
+  for (const cacheName of orderedCacheNames) {
+    const cache = await caches.open(cacheName);
+    const directMatch =
+      (await cache.match(absoluteVoskModelUrl)) ??
+      (await cache.match(absoluteVoskModelUrl, { ignoreSearch: true })) ??
+      (await cache.match(VOSK_MODEL_URL)) ??
+      (await cache.match(VOSK_MODEL_URL, { ignoreSearch: true })) ??
+      (await cache.match(`./${VOSK_MODEL_URL}`)) ??
+      (await cache.match(`./${VOSK_MODEL_URL}`, { ignoreSearch: true }));
+
+    if (directMatch) {
+      return { cacheName, response: directMatch };
+    }
+
+    const matchingRequest = (await cache.keys()).find(isVoskModelRequest);
+    if (matchingRequest) {
+      const response = await cache.match(matchingRequest);
+      if (response) {
+        return { cacheName, response };
+      }
+    }
+  }
+
+  return null;
+}
+
+async function saveVoskModelResponse(response: Response): Promise<void> {
+  const cache = await caches.open(VOSK_MODEL_CACHE_NAME);
+  await cache.put(getVoskModelUrl(), response);
+}
+
 async function clearVoskModelCaches(): Promise<void> {
   navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_VOSK_CACHE" });
-  const absoluteVoskModelUrl = new URL(VOSK_MODEL_URL, window.location.href).href;
+  const absoluteVoskModelUrl = getVoskModelUrl();
 
   const cacheNames = await caches.keys();
   await Promise.all(
@@ -523,14 +581,15 @@ function App() {
       return;
     }
 
-    const cache = await caches.open(VOSK_MODEL_CACHE_NAME);
-    const cachedResponse =
-      (await cache.match(VOSK_MODEL_URL)) ??
-      (await cache.match(new URL(VOSK_MODEL_URL, window.location.href).href));
-    if (!cachedResponse) {
+    const cachedModel = await findCachedVoskModel();
+    if (!cachedModel) {
       setVoskCacheStatus("not-cached");
       setVoskDownloadProgress(null);
       return;
+    }
+
+    if (cachedModel.cacheName !== VOSK_MODEL_CACHE_NAME) {
+      await saveVoskModelResponse(cachedModel.response.clone());
     }
 
     setVoskCacheStatus("cached");
@@ -560,7 +619,6 @@ function App() {
     try {
       await clearVoskModelCaches();
 
-      const cache = await caches.open(VOSK_MODEL_CACHE_NAME);
       const downloadUrl = `${VOSK_MODEL_URL}?download=${Date.now()}`;
       const response = await fetch(downloadUrl, { cache: "reload" });
       if (!response.ok) {
@@ -603,8 +661,7 @@ function App() {
       const modelBlob = new Blob(chunks, {
         type: response.headers.get("content-type") || "application/gzip",
       });
-      await cache.put(
-        new URL(VOSK_MODEL_URL, window.location.href).href,
+      await saveVoskModelResponse(
         new Response(modelBlob, {
           headers: {
             "content-type": modelBlob.type,
@@ -789,16 +846,21 @@ function App() {
             動画を選んで、フルスクリーンにして、Space / Enter / クリックで再生する撮影現場向けキュー再生アプリです。
           </p>
         </div>
-        <div className={`statusBadge status-${cueState}`} aria-live="polite">
+        <div
+          className={`statusBadge status-${cueState}`}
+          aria-live="polite"
+          title="現在の再生状態です。動画未選択、待機中、遅延中、再生中、終了後待機、エラーを表示します。"
+        >
           <span>現在状態</span>
           <strong>{statusLabel}</strong>
         </div>
       </header>
 
       <main className="workspace">
-        <section className="controlPanel" aria-label="操作パネル">
+        <section className="controlPanel" aria-label="操作パネル" title="動画選択、再生、フルスクリーン、表示設定を行う操作パネルです。">
           <div
             className={`dropZone ${isDragActive ? "isDragActive" : ""}`}
+            title="再生したい動画ファイルを選択、またはここへドラッグ&ドロップします。動画はアップロードされません。"
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -810,29 +872,44 @@ function App() {
               accept="video/mp4,video/webm,video/*"
               onChange={(event) => handleFiles(event.currentTarget.files)}
             />
-            <label className="fileButton" htmlFor="video-file">
+            <label
+              className="fileButton"
+              htmlFor="video-file"
+              title="PC内の動画ファイルを1本選択します。mp4やwebmなど、ブラウザで再生できる形式を選んでください。"
+            >
               動画ファイルを選択
             </label>
             <p>またはここへドラッグ&ドロップ</p>
             <small>選択した動画はアップロードされません。ブラウザ上でローカル再生します。</small>
           </div>
 
-          <div className="fileSummary">
+          <div className="fileSummary" title="現在選択されている動画ファイルの名前、容量、長さを表示します。">
             <span>選択中</span>
             <strong>{selectedFileSummary}</strong>
           </div>
 
-          <button className="primaryButton" type="button" onClick={() => triggerPlayback("再生ボタン")}>
+          <button
+            className="primaryButton"
+            type="button"
+            title="動画を先頭から1回再生します。再生中や遅延中に押しても追加再生はされません。"
+            onClick={() => triggerPlayback("再生ボタン")}
+          >
             再生
           </button>
 
           <div className="buttonRow">
-            <button className="secondaryButton" type="button" onClick={() => void toggleFullscreen()}>
+            <button
+              className="secondaryButton"
+              type="button"
+              title="動画プレビューを画面いっぱいに表示します。フルスクリーン中はEscキーで戻れます。"
+              onClick={() => void toggleFullscreen()}
+            >
               {isFullscreen ? "フルスクリーン解除" : "フルスクリーン開始"}
             </button>
             <button
               className="secondaryButton"
               type="button"
+              title="再生中の動画や遅延待ちを止めて、動画を先頭に戻します。"
               onClick={() =>
                 cueStateRef.current === "delay" ? cancelDelay() : stopAndReturnToIdle("停止して先頭へ戻しました。")
               }
@@ -842,10 +919,11 @@ function App() {
           </div>
 
           <div className="settingsGrid">
-            <label className="settingItem">
+            <label className="settingItem" title="再生操作を受けてから、実際に動画が始まるまでの待ち時間を秒で指定します。">
               <span>再生遅延（秒）</span>
               <input
                 type="number"
+                title="0から10秒まで指定できます。0ならすぐ再生します。"
                 min="0"
                 max="10"
                 step="0.1"
@@ -854,7 +932,7 @@ function App() {
               />
             </label>
 
-            <label className="toggleItem">
+            <label className="toggleItem" title="プロジェクターや撮影用途に合わせて、動画を左右反転して表示します。Mキーでも切り替えできます。">
               <input
                 type="checkbox"
                 checked={settings.mirror}
@@ -863,12 +941,17 @@ function App() {
               <span>左右反転</span>
             </label>
 
-            <fieldset className="segmentedControl">
+            <fieldset className="segmentedControl" title="動画を枠内に収めるか、画面いっぱいに切り抜いて表示するかを選びます。">
               <legend>表示方法</legend>
               {(["contain", "cover"] satisfies ObjectFitMode[]).map((mode) => (
                 <button
                   key={mode}
                   type="button"
+                  title={
+                    mode === "contain"
+                      ? "動画全体が見えるように表示します。余白が出る場合があります。"
+                      : "画面いっぱいに表示します。動画の端が切れる場合があります。"
+                  }
                   className={settings.objectFit === mode ? "isSelected" : ""}
                   onClick={() => updateSetting("objectFit", mode)}
                 >
@@ -877,7 +960,7 @@ function App() {
               ))}
             </fieldset>
 
-            <fieldset className="segmentedControl">
+            <fieldset className="segmentedControl" title="再生待機中に、黒背景で隠すか動画の1コマ目を見せるかを選びます。">
               <legend>待機画面</legend>
               {(
                 [
@@ -888,6 +971,11 @@ function App() {
                 <button
                   key={mode}
                   type="button"
+                  title={
+                    mode === "black"
+                      ? "再生待機中は黒背景にします。初期設定です。"
+                      : "再生待機中に動画の1コマ目を表示します。"
+                  }
                   className={settings.waitDisplayMode === mode ? "isSelected" : ""}
                   onClick={() => updateSetting("waitDisplayMode", mode)}
                 >
@@ -896,7 +984,7 @@ function App() {
               ))}
             </fieldset>
 
-            <label className="toggleItem">
+            <label className="toggleItem" title="投影画面下部に、動画選択状況、左右反転、表示方法を表示します。通常はOFFです。">
               <input
                 type="checkbox"
                 checked={settings.showStageOverlay}
@@ -905,7 +993,7 @@ function App() {
               <span>画面下部情報を表示</span>
             </label>
 
-            <label className="toggleItem">
+            <label className="toggleItem" title="再生遅延があるときに、再生までのカウント数字を表示します。">
               <input
                 type="checkbox"
                 checked={settings.showCountdown}
@@ -915,9 +1003,9 @@ function App() {
             </label>
           </div>
 
-          <details className="futurePanel">
-            <summary>音声トリガー設定</summary>
-            <label className="toggleItem">
+          <details className="futurePanel" title="声で再生トリガーを出すための設定を開きます。">
+            <summary title="音声認識のON/OFF、Voskモデル保存、ウェイクワードを設定します。">音声トリガー設定</summary>
+            <label className="toggleItem" title="マイク入力による音声トリガーを使うかどうかを切り替えます。">
               <input
                 type="checkbox"
                 checked={settings.voiceEnabled}
@@ -925,8 +1013,10 @@ function App() {
               />
               <span>音声認識ON/OFF</span>
             </label>
-            <p className="voiceHint">Voskモデルがある場合はVosk、ない場合は対応ブラウザの音声認識に切り替えます。</p>
-            <div className="voskOfflinePanel">
+            <p className="voiceHint" title="オフライン用Voskモデルが使える場合はVoskを優先し、使えない場合は対応ブラウザの音声認識へ切り替えます。">
+              Voskモデルがある場合はVosk、ない場合は対応ブラウザの音声認識に切り替えます。
+            </p>
+            <div className="voskOfflinePanel" title="Vosk日本語モデルをブラウザに保存すると、ネットがない環境でも音声認識を使いやすくなります。">
               <div>
                 <strong>オフライン音声認識</strong>
                 <span>
@@ -941,6 +1031,7 @@ function App() {
               </div>
               <button
                 type="button"
+                title="Vosk日本語モデルをこのブラウザに保存、または保存済みモデルを再保存します。"
                 disabled={voskCacheStatus === "downloading" || voskCacheStatus === "checking"}
                 onClick={() => void cacheVoskModelForOffline()}
               >
@@ -953,6 +1044,7 @@ function App() {
                 type="text"
                 value={wakeWordDraft}
                 placeholder="ウェイクワード"
+                title="音声認識で再生トリガーにしたい短い言葉を入力します。"
                 onChange={(event) => setWakeWordDraft(event.currentTarget.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -961,13 +1053,18 @@ function App() {
                   }
                 }}
               />
-              <button type="button" onClick={addWakeWord}>
+              <button type="button" title="入力したウェイクワードを一覧に追加します。" onClick={addWakeWord}>
                 追加
               </button>
             </div>
             <div className="wakeWordList">
               {settings.wakeWords.map((word) => (
-                <button key={word} type="button" onClick={() => removeWakeWord(word)}>
+                <button
+                  key={word}
+                  type="button"
+                  title={`ウェイクワード「${word}」を削除します。`}
+                  onClick={() => removeWakeWord(word)}
+                >
                   {word} ×
                 </button>
               ))}
@@ -979,6 +1076,7 @@ function App() {
           ref={stageRef}
           className="previewStage"
           aria-label="動画プレビュー"
+          title="動画のプレビュー領域です。クリックまたはタップで再生トリガーになります。"
           onClick={(event) => {
             if (isEditableElement(event.target)) {
               return;
@@ -1038,15 +1136,23 @@ function App() {
         </section>
       </main>
 
-      {errorMessage ? <div className="errorBanner">{errorMessage}</div> : null}
+      {errorMessage ? <div className="errorBanner" title="現在発生しているエラー内容です。">{errorMessage}</div> : null}
 
-      <section className="logPanel" aria-label="簡易ログ">
-        <div className="sectionHeader">
-          <h2>簡易ログ</h2>
-          <button type="button" onClick={() => setLogs([])}>
+      <details className="logPanel" aria-label="簡易ログ" title="アプリの操作結果やエラーを確認できます。通常は折りたたまれています。">
+        <summary className="logSummary" title="クリックすると簡易ログを開閉します。">
+          <span>簡易ログ</span>
+          <button
+            type="button"
+            title="表示されているログを消去します。"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setLogs([]);
+            }}
+          >
             クリア
           </button>
-        </div>
+        </summary>
         <div className="logList" aria-live="polite">
           {logs.length === 0 ? (
             <p className="emptyLog">ログはありません。</p>
@@ -1059,7 +1165,18 @@ function App() {
             ))
           )}
         </div>
-      </section>
+      </details>
+
+      <footer className="appFooter">
+        <span title="現在のアプリバージョンです。">Projection Cue Player {APP_VERSION}</span>
+        <span>
+          開発者: 五味[
+          <a href="https://x.com/GomiHgy" target="_blank" rel="noreferrer" title="開発者のXプロフィールを開きます。">
+            @GomiHgy
+          </a>
+          ]
+        </span>
+      </footer>
     </div>
   );
 }

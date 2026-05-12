@@ -570,6 +570,43 @@ video {
   padding: 16px;
 }
 
+.logSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: 900;
+  list-style: none;
+}
+
+.logSummary::-webkit-details-marker {
+  display: none;
+}
+
+.logSummary::before {
+  content: "▶";
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.logPanel[open] .logSummary {
+  margin-bottom: 10px;
+}
+
+.logPanel[open] .logSummary::before {
+  content: "▼";
+}
+
+.logSummary span {
+  margin-right: auto;
+}
+
+.logSummary button {
+  min-height: 36px;
+}
+
 .sectionHeader {
   display: flex;
   align-items: center;
@@ -628,6 +665,21 @@ video {
 .emptyLog {
   margin: 0;
   color: var(--muted);
+}
+
+.appFooter {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  margin-top: 22px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.appFooter a {
+  color: var(--accent);
+  font-weight: 800;
 }
 
 @media (max-width: 960px) {
