@@ -153,17 +153,17 @@ function describeError(error: unknown): string {
 async function assertVoskModelAvailable(modelUrl: string): Promise<void> {
   const response = await fetch(resolveModelUrl(modelUrl));
   if (!response.ok) {
-    throw new Error(`Voskモデルファイルが見つかりません (${response.status})。`);
+    throw new Error(`オフライン音声認識データが見つかりません (${response.status})。`);
   }
 
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("text/html")) {
-    throw new Error("VoskモデルではなくHTMLが返されました。モデル配置を確認してください。");
+    throw new Error("音声認識データではなくHTMLが返されました。公開ファイルの配置を確認してください。");
   }
 
   const contentLength = Number(response.headers.get("content-length") ?? 0);
   if (contentLength > 0 && contentLength < 1024 * 1024) {
-    throw new Error("Voskモデルファイルが小さすぎます。配置ファイルを確認してください。");
+    throw new Error("音声認識データが小さすぎます。公開ファイルの配置を確認してください。");
   }
 
   await response.body?.cancel().catch(() => undefined);
@@ -178,7 +178,7 @@ async function loadVoskModel(
     const pendingModel = new ModelClass(resolveModelUrl(modelUrl), -1);
     const timeoutId = window.setTimeout(() => {
       pendingModel.terminate();
-      reject(new Error("Voskモデルの読み込みがタイムアウトしました。ブラウザを再読み込みしてもう一度試してください。"));
+      reject(new Error("オフライン音声認識の読み込みに時間がかかりすぎています。ブラウザを再読み込みしてもう一度試してください。"));
     }, 60_000);
 
     pendingModel.on("load", (message) => {
@@ -189,14 +189,14 @@ async function loadVoskModel(
       }
 
       pendingModel.terminate();
-      reject(new Error("Voskモデルの読み込みに失敗しました。"));
+      reject(new Error("オフライン音声認識の読み込みに失敗しました。"));
     });
 
     pendingModel.on("error", (message) => {
       window.clearTimeout(timeoutId);
       pendingModel.terminate();
       const errorMessage = "error" in message ? message.error : JSON.stringify(message);
-      callbacks.onError(`Vosk worker エラー: ${errorMessage}`);
+      callbacks.onError(`オフライン音声認識の処理でエラーが発生しました: ${errorMessage}`);
       reject(new Error(errorMessage));
     });
   });
@@ -269,7 +269,7 @@ class VoskVoiceTriggerService implements VoiceTriggerService {
     await this.stop();
 
     if (!this.isSupported()) {
-      throw new Error("このブラウザではVosk用のマイク入力を開始できません。");
+      throw new Error("このブラウザではオフライン音声認識用のマイク入力を開始できません。");
     }
 
     const AudioContextClass = getAudioContextConstructor();
@@ -283,8 +283,7 @@ class VoskVoiceTriggerService implements VoiceTriggerService {
     this.lastConfig = config;
     this.lastCallbacks = callbacks;
 
-    const modelUrl = resolveModelUrl(VOSK_MODEL_URL);
-    callbacks.onStatus(`Vosk日本語モデルを確認中: ${modelUrl}`);
+    callbacks.onStatus("オフライン音声認識データを確認しています。");
     await assertVoskModelAvailable(VOSK_MODEL_URL);
 
     callbacks.onStatus("マイク権限を確認しています。");
@@ -305,7 +304,7 @@ class VoskVoiceTriggerService implements VoiceTriggerService {
     }
 
     this.mediaStream = mediaStream;
-    callbacks.onStatus(`Vosk日本語モデルを読み込み中: ${modelUrl}`);
+    callbacks.onStatus("オフライン音声認識を読み込んでいます。");
 
     const { Model } = await import("vosk-browser");
     const model = await loadVoskModel(Model, VOSK_MODEL_URL, callbacks);
@@ -352,7 +351,7 @@ class VoskVoiceTriggerService implements VoiceTriggerService {
     this.sourceNode = sourceNode;
     this.processorNode = processorNode;
     this.muteNode = muteNode;
-    callbacks.onStatus("Vosk音声トリガーを開始しました。");
+    callbacks.onStatus("声で再生を開始しました。");
   }
 
   async pause(): Promise<void> {
@@ -386,7 +385,7 @@ class VoskVoiceTriggerService implements VoiceTriggerService {
     this.paused = false;
     this.emitter.resetCooldown();
     this.createRecognizer(this.lastConfig, this.lastCallbacks, this.audioContext.sampleRate);
-    this.lastCallbacks.onStatus("Vosk音声トリガーを再開しました。");
+    this.lastCallbacks.onStatus("声で再生を再開しました。");
   }
 
   async stop(): Promise<void> {
@@ -430,7 +429,7 @@ class VoskVoiceTriggerService implements VoiceTriggerService {
     sampleRate: number,
   ): void {
     if (!this.model) {
-      throw new Error("Voskモデルがまだ読み込まれていません。");
+      throw new Error("オフライン音声認識がまだ読み込まれていません。");
     }
 
     this.recognizer?.remove();
@@ -453,7 +452,7 @@ class VoskVoiceTriggerService implements VoiceTriggerService {
 
     recognizer.on("error", (message) => {
       if (message.event === "error") {
-        callbacks.onError(`Vosk認識エラー: ${message.error}`);
+        callbacks.onError(`オフライン音声認識エラー: ${message.error}`);
       }
     });
   }
@@ -520,7 +519,7 @@ class WebSpeechVoiceTriggerService implements VoiceTriggerService {
 
     this.recognition = recognition;
     recognition.start();
-    callbacks.onStatus("Web Speech API音声トリガーを開始しました。");
+    callbacks.onStatus("ブラウザの音声認識で声で再生を開始しました。");
   }
 
   async pause(): Promise<void> {
@@ -561,7 +560,7 @@ class WebSpeechVoiceTriggerService implements VoiceTriggerService {
     const callbacks = this.lastCallbacks;
     await this.stop();
     await this.start(config, callbacks);
-    callbacks.onStatus("Web Speech API音声トリガーを再開しました。");
+    callbacks.onStatus("声で再生を再開しました。");
   }
 
   async stop(): Promise<void> {
@@ -622,13 +621,13 @@ class HybridVoiceTriggerService implements VoiceTriggerService {
         this.activeService = this.vosk;
         return;
       } catch (error) {
-        callbacks.onError(`Voskを開始できませんでした: ${describeError(error)}`);
+        callbacks.onError(`オフライン音声認識を開始できませんでした: ${describeError(error)}`);
         await this.vosk.stop();
       }
     }
 
     if (this.webSpeech.isSupported()) {
-      callbacks.onStatus("Web Speech APIへ切り替えます。");
+      callbacks.onStatus("ブラウザの音声認識へ切り替えます。");
       await this.webSpeech.start(config, callbacks);
       if (!this.isCurrentRun(runId)) {
         await this.webSpeech.stop();

@@ -94,9 +94,10 @@ h1 {
 .statusBadge {
   min-width: 190px;
   padding: 14px 18px;
-  border: 1px solid var(--line);
+  border: 2px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 }
 
 .statusBadge span {
@@ -108,25 +109,28 @@ h1 {
 .statusBadge strong {
   display: block;
   margin-top: 2px;
-  font-size: 1.55rem;
+  font-size: 1.7rem;
 }
 
 .status-idle,
 .status-ended {
   border-color: rgba(123, 216, 143, 0.7);
+  background: #17291c;
 }
 
 .status-delay {
   border-color: rgba(242, 193, 95, 0.8);
+  background: #3b2c13;
 }
 
 .status-playing {
-  background: #16351f;
+  background: #10431f;
   border-color: var(--accent);
 }
 
 .status-error {
   border-color: var(--danger);
+  background: #4a1f1b;
 }
 
 .workspace {
@@ -149,6 +153,17 @@ h1 {
   flex-direction: column;
   gap: 16px;
   padding: 18px;
+}
+
+.controlGroup {
+  display: grid;
+  gap: 12px;
+}
+
+.controlGroup h2 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 1rem;
 }
 
 .dropZone {
@@ -601,6 +616,16 @@ video {
 
 .logSummary span {
   margin-right: auto;
+}
+
+.logSummary .logAlertBadge {
+  margin-right: 0;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  background: var(--danger);
+  color: #24100e;
+  font-size: 0.82rem;
+  font-weight: 900;
 }
 
 .logSummary button {

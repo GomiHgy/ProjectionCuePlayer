@@ -33,6 +33,16 @@ const STATUS_LABELS: Record<CueState, string> = {
   error: "エラー",
 };
 
+const OBJECT_FIT_LABELS: Record<ObjectFitMode, string> = {
+  contain: "全体表示",
+  cover: "画面いっぱい",
+};
+
+const WAIT_DISPLAY_LABELS: Record<WaitDisplayMode, string> = {
+  black: "黒背景",
+  "first-frame": "最初の画面",
+};
+
 function loadSettings(): AppSettings {
   try {
     const rawValue = window.localStorage.getItem(SETTINGS_KEY);
@@ -216,12 +226,13 @@ function App() {
     "checking",
   );
   const [voskDownloadProgress, setVoskDownloadProgress] = useState<string | null>(null);
+  const [isLogOpen, setIsLogOpen] = useState(false);
   const [logs, setLogs] = useState<AppLog[]>(() => [
     {
       id: makeLogId(),
       time: new Date().toLocaleTimeString("ja-JP", { hour12: false }),
       level: "info",
-      message: "動画を選択すると、1コマ目で待機します。",
+      message: "動画を選択すると、最初の画面で待機します。",
     },
   ]);
 
@@ -236,8 +247,13 @@ function App() {
   const voiceServiceRef = useRef<VoiceTriggerService>(createVoiceTriggerService());
 
   const statusLabel = STATUS_LABELS[cueState];
+  const hasErrorLog = logs.some((log) => log.level === "error");
 
   const addLog = useCallback((message: string, level: AppLog["level"] = "info") => {
+    if (level === "error") {
+      setIsLogOpen(true);
+    }
+
     setLogs((currentLogs) => [
       {
         id: makeLogId(),
@@ -303,8 +319,7 @@ function App() {
         voiceRecoverTimeoutRef.current = null;
         voiceServiceRef.current.recover().catch((error: unknown) => {
           addLog(
-            `${reasonLabel}後に音声認識を再開できませんでした: ${
-              error instanceof Error ? error.message : String(error)
+            `${reasonLabel}後に音声認識を再開できませんでした: ${error instanceof Error ? error.message : String(error)
             }`,
             "warning",
           );
@@ -326,8 +341,7 @@ function App() {
 
     voiceServiceRef.current.pause().catch((error: unknown) => {
       addLog(
-        `再生前に音声認識を一時停止できませんでした: ${
-          error instanceof Error ? error.message : String(error)
+        `再生前に音声認識を一時停止できませんでした: ${error instanceof Error ? error.message : String(error)
         }`,
         "warning",
       );
@@ -458,8 +472,8 @@ function App() {
       }, 2000);
     } catch {
       setCueState("error");
-      setErrorMessage("フルスクリーンを開始できませんでした。ブラウザの許可や表示先を確認してください。");
-      addLog("フルスクリーン開始に失敗しました。", "error");
+      setErrorMessage("撮影モードを開始できませんでした。ブラウザの許可や表示先を確認してください。");
+      addLog("撮影モードの開始に失敗しました。", "error");
     }
   }, [addLog, setCueState]);
 
@@ -509,7 +523,7 @@ function App() {
     resetVideoToFirstFrame();
     setCueState("idle");
     setErrorMessage(null);
-    addLog("動画は1コマ目で待機しています。", "success");
+    addLog("動画は最初の画面で待機しています。", "success");
   }, [addLog, resetVideoToFirstFrame, setCueState]);
 
   const handleVideoError = useCallback(() => {
@@ -593,28 +607,28 @@ function App() {
     }
 
     setVoskCacheStatus("cached");
-    setVoskDownloadProgress("Voskモデルはオフライン用に保存済みです。");
+    setVoskDownloadProgress("オフライン音声認識は準備済みです。");
   }, []);
 
   const cacheVoskModelForOffline = useCallback(async () => {
     if (!("caches" in window)) {
       setVoskCacheStatus("error");
       setVoskDownloadProgress("このブラウザではオフライン保存を利用できません。");
-      addLog("ブラウザがCache Storageに対応していないため、Voskモデルを保存できません。", "warning");
+      addLog("ブラウザがCache Storageに対応していないため、オフライン音声認識データを保存できません。", "warning");
       return;
     }
 
     const confirmed = window.confirm(
-      `Vosk日本語モデルをこのブラウザに保存します。大きなファイル(${VOSK_MODEL_SIZE_LABEL})をダウンロードします。オフライン音声認識のために保存しますか？`,
+      `オフライン音声認識に必要な日本語データをこのブラウザに保存します。大きなファイル(${VOSK_MODEL_SIZE_LABEL})をダウンロードします。保存しますか？`,
     );
     if (!confirmed) {
-      addLog("Voskモデルのオフライン保存をキャンセルしました。", "info");
+      addLog("オフライン音声認識の準備をキャンセルしました。", "info");
       return;
     }
 
     setVoskCacheStatus("downloading");
-    setVoskDownloadProgress("Voskモデルをダウンロード中です。");
-    addLog("ユーザーの許可を受けて、Voskモデルのオフライン保存を開始しました。", "info");
+    setVoskDownloadProgress("オフライン音声認識データをダウンロード中です。");
+    addLog("ユーザーの許可を受けて、オフライン音声認識の準備を開始しました。", "info");
 
     try {
       await clearVoskModelCaches();
@@ -627,7 +641,7 @@ function App() {
 
       const contentType = response.headers.get("content-type") ?? "";
       if (contentType.includes("text/html")) {
-        throw new Error("VoskモデルではなくHTMLが返されました。公開ファイルの配置を確認してください。");
+        throw new Error("音声認識データではなくHTMLが返されました。公開ファイルの配置を確認してください。");
       }
 
       const reader = response.body?.getReader();
@@ -649,12 +663,12 @@ function App() {
         if (headerBytes > 0) {
           const percent = Math.min(100, Math.round((receivedBytes / headerBytes) * 100));
           setVoskDownloadProgress(
-            `Voskモデルをダウンロード中です。${percent}% (${formatBytes(receivedBytes)} / ${formatBytes(
+            `オフライン音声認識データをダウンロード中です。${percent}% (${formatBytes(receivedBytes)} / ${formatBytes(
               headerBytes,
             )})`,
           );
         } else {
-          setVoskDownloadProgress(`Voskモデルをダウンロード中です。${formatBytes(receivedBytes)}`);
+          setVoskDownloadProgress(`オフライン音声認識データをダウンロード中です。${formatBytes(receivedBytes)}`);
         }
       }
 
@@ -670,14 +684,14 @@ function App() {
         }),
       );
       setVoskCacheStatus("cached");
-      setVoskDownloadProgress("Voskモデルはオフライン用に保存済みです。");
+      setVoskDownloadProgress("オフライン音声認識は準備済みです。");
       updateSetting("offlineVoskEnabled", true);
-      addLog("Voskモデルをオフライン用に保存しました。", "success");
+      addLog("オフライン音声認識を準備しました。", "success");
     } catch (error) {
       setVoskCacheStatus("error");
       const message = error instanceof Error ? error.message : String(error);
-      setVoskDownloadProgress(`Voskモデルを保存できませんでした: ${message}`);
-      addLog(`Voskモデルを保存できませんでした: ${message}`, "error");
+      setVoskDownloadProgress(`オフライン音声認識を準備できませんでした: ${message}`);
+      addLog(`オフライン音声認識を準備できませんでした: ${message}`, "error");
     }
   }, [addLog, updateSetting]);
 
@@ -697,7 +711,8 @@ function App() {
     checkVoskModelCache().catch((error: unknown) => {
       setVoskCacheStatus("error");
       setVoskDownloadProgress(
-        `Voskモデルの保存状態を確認できませんでした: ${error instanceof Error ? error.message : String(error)}`,
+        `オフライン音声認識の準備状態を確認できませんでした: ${error instanceof Error ? error.message : String(error)
+        }`,
       );
     });
   }, [checkVoskModelCache]);
@@ -818,7 +833,7 @@ function App() {
               result.matchedWakeWord ? "success" : "info",
             );
             if (result.matchedWakeWord) {
-              triggerPlayback("音声トリガー");
+              triggerPlayback("声で再生");
             }
           },
           onError: (message) => addLog(message, "warning"),
@@ -840,10 +855,9 @@ function App() {
     <div className="appShell">
       <header className="appHeader">
         <div>
-          <p className="eyebrow">Projector Video Cue</p>
-          <h1>Projection Cue Player</h1>
+          <h2>Projection Cue Player</h2>
           <p className="lead">
-            動画を選んで、フルスクリーンにして、Space / Enter / クリックで再生する撮影現場向けキュー再生アプリです。
+            選んだ動画を音声/スペース/エンター/クリックで再生する撮影現場向けキュー再生アプリ
           </p>
         </div>
         <div
@@ -857,7 +871,7 @@ function App() {
       </header>
 
       <main className="workspace">
-        <section className="controlPanel" aria-label="操作パネル" title="動画選択、再生、フルスクリーン、表示設定を行う操作パネルです。">
+        <section className="controlPanel" aria-label="操作パネル" title="動画選択、再生、撮影モード、表示設定を行う操作パネルです。">
           <div
             className={`dropZone ${isDragActive ? "isDragActive" : ""}`}
             title="再生したい動画ファイルを選択、またはここへドラッグ&ドロップします。動画はアップロードされません。"
@@ -888,37 +902,41 @@ function App() {
             <strong>{selectedFileSummary}</strong>
           </div>
 
-          <button
-            className="primaryButton"
-            type="button"
-            title="動画を先頭から1回再生します。再生中や遅延中に押しても追加再生はされません。"
-            onClick={() => triggerPlayback("再生ボタン")}
-          >
-            再生
-          </button>
+          <div className="controlGroup controlGroup-live">
+            <h2>本番操作</h2>
+            <button
+              className="primaryButton"
+              type="button"
+              title="動画を先頭から1回再生します。再生中や遅延中に押しても追加再生はされません。"
+              onClick={() => triggerPlayback("再生ボタン")}
+            >
+              再生
+            </button>
 
-          <div className="buttonRow">
-            <button
-              className="secondaryButton"
-              type="button"
-              title="動画プレビューを画面いっぱいに表示します。フルスクリーン中はEscキーで戻れます。"
-              onClick={() => void toggleFullscreen()}
-            >
-              {isFullscreen ? "フルスクリーン解除" : "フルスクリーン開始"}
-            </button>
-            <button
-              className="secondaryButton"
-              type="button"
-              title="再生中の動画や遅延待ちを止めて、動画を先頭に戻します。"
-              onClick={() =>
-                cueStateRef.current === "delay" ? cancelDelay() : stopAndReturnToIdle("停止して先頭へ戻しました。")
-              }
-            >
-              停止して先頭へ
-            </button>
+            <div className="buttonRow">
+              <button
+                className="secondaryButton"
+                type="button"
+                title="動画プレビューを画面いっぱいに表示します。撮影モード中はEscキーで戻れます。"
+                onClick={() => void toggleFullscreen()}
+              >
+                {isFullscreen ? "撮影モード終了" : "撮影モードへ"}
+              </button>
+              <button
+                className="secondaryButton"
+                type="button"
+                title="再生中の動画や遅延待ちを止めて、動画を先頭に戻します。"
+                onClick={() =>
+                  cueStateRef.current === "delay" ? cancelDelay() : stopAndReturnToIdle("停止して先頭へ戻しました。")
+                }
+              >
+                停止して先頭へ
+              </button>
+            </div>
           </div>
 
-          <div className="settingsGrid">
+          <div className="controlGroup settingsGrid">
+            <h2>準備設定</h2>
             <label className="settingItem" title="再生操作を受けてから、実際に動画が始まるまでの待ち時間を秒で指定します。">
               <span>再生遅延（秒）</span>
               <input
@@ -942,7 +960,7 @@ function App() {
             </label>
 
             <fieldset className="segmentedControl" title="動画を枠内に収めるか、画面いっぱいに切り抜いて表示するかを選びます。">
-              <legend>表示方法</legend>
+              <legend>動画の表示</legend>
               {(["contain", "cover"] satisfies ObjectFitMode[]).map((mode) => (
                 <button
                   key={mode}
@@ -955,42 +973,37 @@ function App() {
                   className={settings.objectFit === mode ? "isSelected" : ""}
                   onClick={() => updateSetting("objectFit", mode)}
                 >
-                  {mode}
+                  {OBJECT_FIT_LABELS[mode]}
                 </button>
               ))}
             </fieldset>
 
-            <fieldset className="segmentedControl" title="再生待機中に、黒背景で隠すか動画の1コマ目を見せるかを選びます。">
-              <legend>待機画面</legend>
-              {(
-                [
-                  ["black", "黒背景"],
-                  ["first-frame", "1コマ目"],
-                ] satisfies Array<[WaitDisplayMode, string]>
-              ).map(([mode, label]) => (
+            <fieldset className="segmentedControl" title="再生待機中に、黒背景で隠すか動画の最初の画面を見せるかを選びます。">
+              <legend>待機中の表示</legend>
+              {(["black", "first-frame"] satisfies WaitDisplayMode[]).map((mode) => (
                 <button
                   key={mode}
                   type="button"
                   title={
                     mode === "black"
                       ? "再生待機中は黒背景にします。初期設定です。"
-                      : "再生待機中に動画の1コマ目を表示します。"
+                      : "再生待機中に動画の最初の画面を表示します。"
                   }
                   className={settings.waitDisplayMode === mode ? "isSelected" : ""}
                   onClick={() => updateSetting("waitDisplayMode", mode)}
                 >
-                  {label}
+                  {WAIT_DISPLAY_LABELS[mode]}
                 </button>
               ))}
             </fieldset>
 
-            <label className="toggleItem" title="投影画面下部に、動画選択状況、左右反転、表示方法を表示します。通常はOFFです。">
+            <label className="toggleItem" title="投影画面下部に、動画選択状況、左右反転、動画の表示設定を表示します。通常はOFFです。">
               <input
                 type="checkbox"
                 checked={settings.showStageOverlay}
                 onChange={(event) => updateSetting("showStageOverlay", event.currentTarget.checked)}
               />
-              <span>画面下部情報を表示</span>
+              <span>投影画面の情報</span>
             </label>
 
             <label className="toggleItem" title="再生遅延があるときに、再生までのカウント数字を表示します。">
@@ -999,43 +1012,43 @@ function App() {
                 checked={settings.showCountdown}
                 onChange={(event) => updateSetting("showCountdown", event.currentTarget.checked)}
               />
-              <span>遅延カウントを表示</span>
+              <span>カウントを表示</span>
             </label>
           </div>
 
-          <details className="futurePanel" title="声で再生トリガーを出すための設定を開きます。">
-            <summary title="音声認識のON/OFF、Voskモデル保存、ウェイクワードを設定します。">音声トリガー設定</summary>
-            <label className="toggleItem" title="マイク入力による音声トリガーを使うかどうかを切り替えます。">
+          <details className="futurePanel" title="声で再生するための設定を開きます。">
+            <summary title="声で再生するためのON/OFF、オフライン準備、ウェイクワードを設定します。">声で再生</summary>
+            <label className="toggleItem" title="マイク入力で再生するかどうかを切り替えます。">
               <input
                 type="checkbox"
                 checked={settings.voiceEnabled}
                 onChange={(event) => updateSetting("voiceEnabled", event.currentTarget.checked)}
               />
-              <span>音声認識ON/OFF</span>
+              <span>声で再生</span>
             </label>
-            <p className="voiceHint" title="オフライン用Voskモデルが使える場合はVoskを優先し、使えない場合は対応ブラウザの音声認識へ切り替えます。">
-              Voskモデルがある場合はVosk、ない場合は対応ブラウザの音声認識に切り替えます。
+            <p className="voiceHint" title="オフライン用の音声認識データが使える場合はそれを優先し、使えない場合は対応ブラウザの音声認識へ切り替えます。">
+              ウェイクワードを聞き取ると再生します。オフライン準備済みならネットなしでも使えます。
             </p>
-            <div className="voskOfflinePanel" title="Vosk日本語モデルをブラウザに保存すると、ネットがない環境でも音声認識を使いやすくなります。">
+            <div className="voskOfflinePanel" title="オフライン用の音声認識データをブラウザに保存すると、ネットがない環境でも声で再生を使いやすくなります。">
               <div>
                 <strong>オフライン音声認識</strong>
                 <span>
                   {voskCacheStatus === "cached"
-                    ? "Voskモデル保存済み"
+                    ? "準備済み"
                     : voskCacheStatus === "downloading"
                       ? "保存中"
                       : voskCacheStatus === "checking"
                         ? "確認中"
-                        : "Voskモデル未保存"}
+                        : "未準備"}
                 </span>
               </div>
               <button
                 type="button"
-                title="Vosk日本語モデルをこのブラウザに保存、または保存済みモデルを再保存します。"
+                title="オフライン音声認識に必要な日本語データをこのブラウザに保存、または再保存します。"
                 disabled={voskCacheStatus === "downloading" || voskCacheStatus === "checking"}
                 onClick={() => void cacheVoskModelForOffline()}
               >
-                {voskCacheStatus === "cached" ? "再保存" : "Voskモデルを保存"}
+                {voskCacheStatus === "cached" ? "再準備" : "オフライン準備"}
               </button>
             </div>
             {voskDownloadProgress ? <p className="voiceHint">{voskDownloadProgress}</p> : null}
@@ -1076,7 +1089,7 @@ function App() {
           ref={stageRef}
           className="previewStage"
           aria-label="動画プレビュー"
-          title="動画のプレビュー領域です。クリックまたはタップで再生トリガーになります。"
+          title="動画のプレビュー領域です。クリックまたはタップで再生できます。"
           onClick={(event) => {
             if (isEditableElement(event.target)) {
               return;
@@ -1086,9 +1099,8 @@ function App() {
           }}
         >
           <div
-            className={`videoFrame ${
-              videoUrl && cueState !== "playing" && settings.waitDisplayMode === "black" ? "isBlackWaiting" : ""
-            }`}
+            className={`videoFrame ${videoUrl && cueState !== "playing" && settings.waitDisplayMode === "black" ? "isBlackWaiting" : ""
+              }`}
           >
             {videoUrl ? (
               <video
@@ -1123,13 +1135,13 @@ function App() {
               <div className="stageOverlay">
                 <span>{selectedFile ? "動画選択済み" : "動画未選択"}</span>
                 <span>{settings.mirror ? "左右反転 ON" : "左右反転 OFF"}</span>
-                <span>{settings.objectFit}</span>
+                <span>{OBJECT_FIT_LABELS[settings.objectFit]}</span>
               </div>
             ) : null}
 
             {showFullscreenHint ? (
               <div className="fullscreenHint" aria-live="polite">
-                Escキーでフルスクリーンを解除できます
+                Escキーで撮影モードを終了できます
               </div>
             ) : null}
           </div>
@@ -1138,9 +1150,16 @@ function App() {
 
       {errorMessage ? <div className="errorBanner" title="現在発生しているエラー内容です。">{errorMessage}</div> : null}
 
-      <details className="logPanel" aria-label="簡易ログ" title="アプリの操作結果やエラーを確認できます。通常は折りたたまれています。">
+      <details
+        className="logPanel"
+        aria-label="簡易ログ"
+        open={isLogOpen}
+        title="アプリの操作結果やエラーを確認できます。通常は折りたたまれています。"
+        onToggle={(event) => setIsLogOpen(event.currentTarget.open)}
+      >
         <summary className="logSummary" title="クリックすると簡易ログを開閉します。">
           <span>簡易ログ</span>
+          {hasErrorLog ? <span className="logAlertBadge">エラーあり</span> : null}
           <button
             type="button"
             title="表示されているログを消去します。"
