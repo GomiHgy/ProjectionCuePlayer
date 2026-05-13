@@ -59,6 +59,58 @@ const RECOMMENDED_SPEC_ITEMS = [
   "保存先: SSD上の動画ファイルを推奨",
 ];
 
+const LICENSE_ITEMS = [
+  {
+    name: "React",
+    version: "19.2.6",
+    purpose: "画面UI",
+    license: "MIT License",
+    url: "https://react.dev/",
+  },
+  {
+    name: "React DOM",
+    version: "19.2.6",
+    purpose: "ブラウザ描画",
+    license: "MIT License",
+    url: "https://react.dev/",
+  },
+  {
+    name: "Vosk / vosk-browser",
+    version: "0.0.8",
+    purpose: "オフライン音声認識",
+    license: "Apache License 2.0",
+    url: "https://www.npmjs.com/package/vosk-browser",
+  },
+  {
+    name: "Vosk Japanese small model",
+    version: "vosk-model-small-ja-0.22",
+    purpose: "日本語音声認識モデル",
+    license: "Apache License 2.0",
+    url: "https://alphacephei.com/vosk/models",
+  },
+  {
+    name: "Vite",
+    version: "7.3.3",
+    purpose: "Webアプリのビルド",
+    license: "MIT License",
+    url: "https://vite.dev/",
+  },
+  {
+    name: "TypeScript",
+    version: "5.9.3",
+    purpose: "型安全な開発",
+    license: "Apache License 2.0",
+    url: "https://www.typescriptlang.org/",
+  },
+  {
+    name: "@vitejs/plugin-react",
+    version: "5.2.0",
+    purpose: "React用ビルド連携",
+    license: "MIT License",
+    url: "https://github.com/vitejs/vite-plugin-react",
+  },
+];
+
 type NavigatorWithDeviceMemory = Navigator & {
   deviceMemory?: number;
 };
@@ -1416,14 +1468,34 @@ function App() {
       </details>
 
       <footer className="appFooter">
-        <span title="現在のアプリバージョンです。">Projection Cue Player {APP_VERSION}</span>
-        <span>
-          開発者: 五味[
-          <a href="https://x.com/GomiHgy" target="_blank" rel="noreferrer" title="開発者のXプロフィールを開きます。">
-            @GomiHgy
-          </a>
-          ]
-        </span>
+        <div className="footerMeta">
+          <span title="現在のアプリバージョンです。">Projection Cue Player {APP_VERSION}</span>
+          <span>
+            開発者: 五味[
+            <a href="https://x.com/GomiHgy" target="_blank" rel="noreferrer" title="開発者のXプロフィールを開きます。">
+              @GomiHgy
+            </a>
+            ]
+          </span>
+        </div>
+
+        <details className="licensePanel" title="このアプリで使用している主なライブラリ、音声認識モデル、ライセンスを表示します。">
+          <summary>使用技術・ライセンス</summary>
+          <p>
+            このアプリは以下のオープンソースソフトウェアと音声認識モデルを使用しています。音声認識モデルは、ユーザーが許可した場合のみブラウザ内に保存されます。
+          </p>
+          <div className="licenseList">
+            {LICENSE_ITEMS.map((item) => (
+              <a key={`${item.name}-${item.version}`} href={item.url} target="_blank" rel="noreferrer">
+                <strong>{item.name}</strong>
+                <span>{item.version}</span>
+                <span>{item.purpose}</span>
+                <em>{item.license}</em>
+              </a>
+            ))}
+          </div>
+          <p>動画ファイルはアップロードされません。PCのブラウザ内だけで再生します。</p>
+        </details>
       </footer>
     </div>
   );

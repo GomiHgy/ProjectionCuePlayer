@@ -91,6 +91,22 @@ public/vosk/vosk-model-small-ja-0.22.tar.gz
 
 モデルファイルがない場合、対応ブラウザではWeb Speech APIへフォールバックします。動画ファイルはService Workerでキャッシュしません。
 
+## ライセンス表示
+
+Webページ下部に「使用技術・ライセンス」の折りたたみ表示を置いています。一般ユーザーの操作を邪魔しないよう、通常は閉じた状態で、主なライブラリと音声認識モデルだけを表示します。
+
+| 名称 | バージョン | 用途 | ライセンス |
+| --- | --- | --- | --- |
+| React | 19.2.6 | 画面UI | MIT License |
+| React DOM | 19.2.6 | ブラウザ描画 | MIT License |
+| Vosk / vosk-browser | 0.0.8 | オフライン音声認識 | Apache License 2.0 |
+| Vosk Japanese small model | vosk-model-small-ja-0.22 | 日本語音声認識モデル | Apache License 2.0 |
+| Vite | 7.3.3 | Webアプリのビルド | MIT License |
+| TypeScript | 5.9.3 | 型安全な開発 | Apache License 2.0 |
+| @vitejs/plugin-react | 5.2.0 | React用ビルド連携 | MIT License |
+
+依存ライブラリを更新した場合は、`package-lock.json` と各パッケージの `package.json` を確認し、`src/App.tsx` の `LICENSE_ITEMS` とこの表を更新してください。
+
 ## GitHub Pagesデプロイ
 
 このリポジトリには `.github/workflows/pages.yml` を追加済みです。

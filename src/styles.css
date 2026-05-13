@@ -819,17 +819,100 @@ video {
 }
 
 .appFooter {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px 18px;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
   margin-top: 22px;
   color: var(--muted);
   font-size: 0.9rem;
 }
 
+.footerMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+}
+
 .appFooter a {
   color: var(--accent);
+  font-weight: 800;
+}
+
+.licensePanel {
+  width: min(760px, 100%);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #1d1b17;
+}
+
+.licensePanel summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 900;
+  list-style: none;
+}
+
+.licensePanel summary::-webkit-details-marker {
+  display: none;
+}
+
+.licensePanel summary::before {
+  content: "▶";
+  color: var(--accent);
+  font-size: 0.82rem;
+}
+
+.licensePanel[open] summary {
+  margin-bottom: 10px;
+}
+
+.licensePanel[open] summary::before {
+  content: "▼";
+}
+
+.licensePanel p {
+  margin: 0 0 10px;
+  text-align: left;
+}
+
+.licenseList {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.licenseList a {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(92px, 0.7fr) minmax(130px, 1fr) minmax(120px, 0.8fr);
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+}
+
+.licenseList a:hover {
+  background: #3a352b;
+}
+
+.licenseList strong,
+.licenseList span,
+.licenseList em {
+  overflow-wrap: anywhere;
+}
+
+.licenseList em {
+  color: var(--accent);
+  font-style: normal;
   font-weight: 800;
 }
 
@@ -854,6 +937,10 @@ video {
   .videoFrame,
   video {
     min-height: 390px;
+  }
+
+  .licenseList a {
+    grid-template-columns: 1fr;
   }
 }
 
