@@ -43,6 +43,45 @@ const WAIT_DISPLAY_LABELS: Record<WaitDisplayMode, string> = {
   "first-frame": "最初の画面",
 };
 
+const MINIMUM_SPEC_ITEMS = [
+  "Chrome / Edge の最新版",
+  "CPU: 4コア以上",
+  "メモリ: 8GB以上",
+  "動画: H.264 MP4 / 1920×1080 / 30fps程度",
+  "GPU: H.264などの動画再生支援が使える内蔵GPUまたは外部GPU",
+];
+
+const RECOMMENDED_SPEC_ITEMS = [
+  "CPU: Intel Core i5 第8世代 / Ryzen 5 3000 相当以上",
+  "メモリ: 16GB以上",
+  "動画: H.264 MP4 / 1920×1080 30〜60fpsを推奨",
+  "4K動画: 6〜8コア以上、16GB以上、4K再生支援のあるGPUを推奨",
+  "保存先: SSD上の動画ファイルを推奨",
+];
+
+type NavigatorWithDeviceMemory = Navigator & {
+  deviceMemory?: number;
+};
+
+type VideoDimensions = {
+  width: number;
+  height: number;
+};
+
+type SpecLevel = "ok" | "warning" | "unknown";
+
+type SpecAssessment = {
+  level: SpecLevel;
+  badgeLabel: string;
+  cores: number | null;
+  memoryGb: number | null;
+  mp4Support: CanPlayTypeResult;
+  webmSupport: CanPlayTypeResult;
+  selectedVideoLabel: string;
+  warnings: string[];
+  notes: string[];
+};
+
 function loadSettings(): AppSettings {
   try {
     const rawValue = window.localStorage.getItem(SETTINGS_KEY);
@@ -191,6 +230,111 @@ function formatDuration(duration: number | null): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function formatResolution(dimensions: VideoDimensions | null): string {
+  if (!dimensions) {
+    return "動画選択後に表示";
+  }
+
+  return `${dimensions.width}×${dimensions.height}`;
+}
+
+function describeCanPlay(value: CanPlayTypeResult): string {
+  if (value === "probably") {
+    return "対応見込み";
+  }
+
+  if (value === "maybe") {
+    return "再生できる可能性あり";
+  }
+
+  return "未確認";
+}
+
+function getDeviceMemoryGb(): number | null {
+  const deviceMemory = (navigator as NavigatorWithDeviceMemory).deviceMemory;
+  return typeof deviceMemory === "number" && Number.isFinite(deviceMemory) ? deviceMemory : null;
+}
+
+function getBrowserCanPlay(type: string): CanPlayTypeResult {
+  const video = document.createElement("video");
+  return video.canPlayType(type);
+}
+
+function assessSpecs(selectedFile: File | null, videoDimensions: VideoDimensions | null): SpecAssessment {
+  const cores = Number.isFinite(navigator.hardwareConcurrency) && navigator.hardwareConcurrency > 0
+    ? navigator.hardwareConcurrency
+    : null;
+  const memoryGb = getDeviceMemoryGb();
+  const mp4Support =
+    getBrowserCanPlay('video/mp4; codecs="avc1.42E01E, mp4a.40.2"') || getBrowserCanPlay("video/mp4");
+  const webmSupport =
+    getBrowserCanPlay('video/webm; codecs="vp8, vorbis"') || getBrowserCanPlay("video/webm");
+  const selectedVideoLabel = selectedFile
+    ? `${selectedFile.name} / ${formatFileSize(selectedFile.size)} / ${formatResolution(videoDimensions)}`
+    : "未選択";
+  const warnings: string[] = [];
+  const notes: string[] = [];
+
+  if (cores === null) {
+    notes.push("CPUコア数はブラウザから取得できませんでした。");
+  } else if (cores < 4) {
+    warnings.push("CPUコア数が4未満です。1080p動画でも再生が不安定になる可能性があります。");
+  } else if (cores < 6) {
+    notes.push("CPUは最低目安を満たしていますが、4K動画や声で再生を同時に使う場合は余裕が少ない可能性があります。");
+  }
+
+  if (memoryGb === null) {
+    notes.push("メモリ容量はブラウザから取得できませんでした。8GB以上、できれば16GB以上を目安にしてください。");
+  } else if (memoryGb < 4) {
+    warnings.push("メモリが4GB未満です。動画再生やオフライン音声認識が不安定になる可能性があります。");
+  } else if (memoryGb < 8) {
+    warnings.push("メモリが8GB未満です。撮影本番では8GB以上、できれば16GB以上を推奨します。");
+  }
+
+  if (mp4Support === "" && webmSupport === "") {
+    warnings.push("このブラウザでは一般的なmp4/webm動画の再生対応を確認できませんでした。ChromeまたはEdgeを推奨します。");
+  }
+
+  if (selectedFile?.type) {
+    const selectedTypeSupport = getBrowserCanPlay(selectedFile.type);
+    if (selectedFile.type.startsWith("video/") && selectedTypeSupport === "") {
+      warnings.push("選択中の動画形式は、このブラウザで再生できない可能性があります。H.264のmp4で書き出すと安定しやすいです。");
+    }
+  }
+
+  if (selectedFile && selectedFile.size > 2 * 1024 * 1024 * 1024) {
+    notes.push("選択中の動画ファイルが2GBを超えています。SSD上に置き、事前に通し再生してください。");
+  }
+
+  if (videoDimensions) {
+    const is4K = videoDimensions.width >= 3840 || videoDimensions.height >= 2160;
+    const isAboveFullHd = videoDimensions.width > 1920 || videoDimensions.height > 1080;
+
+    if (is4K && ((cores !== null && cores < 8) || (memoryGb !== null && memoryGb < 8))) {
+      warnings.push("選択中の動画は4K相当です。このPCではコマ落ちする可能性があります。1080p版の動画も用意してください。");
+    } else if (isAboveFullHd && ((cores !== null && cores < 6) || (memoryGb !== null && memoryGb < 8))) {
+      warnings.push("選択中の動画はフルHDを超えています。このPCでは再生が不安定になる可能性があります。");
+    } else if (is4K) {
+      notes.push("4K動画はPCやGPUによって差が出ます。撮影前に撮影モードで通し再生してください。");
+    }
+  }
+
+  const level: SpecLevel = warnings.length > 0 ? "warning" : cores === null || memoryGb === null ? "unknown" : "ok";
+  const badgeLabel = level === "warning" ? "注意" : level === "unknown" ? "一部不明" : "目安OK";
+
+  return {
+    level,
+    badgeLabel,
+    cores,
+    memoryGb,
+    mp4Support,
+    webmSupport,
+    selectedVideoLabel,
+    warnings,
+    notes,
+  };
+}
+
 function isEditableElement(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -216,6 +360,7 @@ function App() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const [videoDimensions, setVideoDimensions] = useState<VideoDimensions | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -506,6 +651,7 @@ function App() {
       setVideoUrl(nextUrl);
       setSelectedFile(file);
       setVideoDuration(null);
+      setVideoDimensions(null);
       setErrorMessage(null);
       setCueState("idle");
       setCountdown(null);
@@ -517,6 +663,14 @@ function App() {
   const handleVideoMetadata = useCallback(() => {
     const video = videoRef.current;
     setVideoDuration(video?.duration ?? null);
+    setVideoDimensions(
+      video && video.videoWidth > 0 && video.videoHeight > 0
+        ? {
+          width: video.videoWidth,
+          height: video.videoHeight,
+        }
+        : null,
+    );
   }, []);
 
   const handleVideoLoaded = useCallback(() => {
@@ -702,6 +856,11 @@ function App() {
 
     return `${selectedFile.name} / ${formatFileSize(selectedFile.size)} / ${formatDuration(videoDuration)}`;
   }, [selectedFile, videoDuration]);
+
+  const specAssessment = useMemo(
+    () => assessSpecs(selectedFile, videoDimensions),
+    [selectedFile, videoDimensions],
+  );
 
   useEffect(() => {
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -901,6 +1060,76 @@ function App() {
             <span>選択中</span>
             <strong>{selectedFileSummary}</strong>
           </div>
+
+          <details
+            className={`specPanel spec-${specAssessment.level}`}
+            open={specAssessment.level === "warning"}
+            title="このPCで動画再生に使える目安情報と、推奨スペックを確認できます。"
+          >
+            <summary>
+              <span>PCスペック目安</span>
+              <strong>{specAssessment.badgeLabel}</strong>
+            </summary>
+
+            {specAssessment.warnings.length > 0 ? (
+              <div className="specWarning" role="alert">
+                <strong>このPCでは再生が不安定になる可能性があります。</strong>
+                {specAssessment.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            ) : (
+              <p className="specOk">
+                取得できた範囲では大きな問題は見つかっていません。撮影前に、実際の動画を撮影モードで通し再生してください。
+              </p>
+            )}
+
+            <div className="specInfoGrid">
+              <div>
+                <span>CPU</span>
+                <strong>{specAssessment.cores === null ? "取得できません" : `${specAssessment.cores} 論理コア`}</strong>
+              </div>
+              <div>
+                <span>メモリ</span>
+                <strong>{specAssessment.memoryGb === null ? "取得できません" : `${specAssessment.memoryGb} GB以上`}</strong>
+              </div>
+              <div>
+                <span>mp4</span>
+                <strong>{describeCanPlay(specAssessment.mp4Support)}</strong>
+              </div>
+              <div>
+                <span>webm</span>
+                <strong>{describeCanPlay(specAssessment.webmSupport)}</strong>
+              </div>
+              <div className="specInfoWide">
+                <span>選択中の動画</span>
+                <strong>{specAssessment.selectedVideoLabel}</strong>
+              </div>
+            </div>
+
+            {specAssessment.notes.length > 0 ? (
+              <div className="specNotes">
+                {specAssessment.notes.map((note) => (
+                  <p key={note}>{note}</p>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="specLists">
+              <div>
+                <h3>最低目安</h3>
+                {MINIMUM_SPEC_ITEMS.map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+              </div>
+              <div>
+                <h3>推奨スペック</h3>
+                {RECOMMENDED_SPEC_ITEMS.map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+              </div>
+            </div>
+          </details>
 
           <div className="controlGroup controlGroup-live">
             <h2>本番操作</h2>

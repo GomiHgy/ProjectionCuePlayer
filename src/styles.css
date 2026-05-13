@@ -254,6 +254,132 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.specPanel {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #1d1b17;
+}
+
+.specPanel summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 900;
+  list-style: none;
+}
+
+.specPanel summary::-webkit-details-marker {
+  display: none;
+}
+
+.specPanel summary::before {
+  content: "▶";
+  color: var(--accent);
+  font-size: 0.82rem;
+}
+
+.specPanel[open] summary {
+  margin-bottom: 12px;
+}
+
+.specPanel[open] summary::before {
+  content: "▼";
+}
+
+.specPanel summary span {
+  flex: 1;
+}
+
+.specPanel summary strong {
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  background: #3a352b;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.spec-warning {
+  border-color: rgba(242, 193, 95, 0.85);
+  background: #251f13;
+}
+
+.spec-warning summary strong {
+  background: var(--warning);
+  color: #241a08;
+}
+
+.spec-ok summary strong {
+  background: var(--accent);
+  color: #102013;
+}
+
+.specWarning,
+.specOk,
+.specNotes {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.specWarning strong,
+.specWarning p,
+.specOk,
+.specNotes p,
+.specLists p {
+  margin: 0;
+}
+
+.specWarning {
+  color: #ffe7b8;
+}
+
+.specInfoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.specInfoGrid div {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+}
+
+.specInfoGrid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.specInfoGrid strong {
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+}
+
+.specInfoWide {
+  grid-column: 1 / -1;
+}
+
+.specLists {
+  display: grid;
+  gap: 12px;
+}
+
+.specLists h3 {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 0.95rem;
+}
+
+.specLists p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .primaryButton {
   min-height: 88px;
   background: var(--accent);

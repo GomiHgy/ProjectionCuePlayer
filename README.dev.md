@@ -58,7 +58,7 @@ npm run build
 
 ## 主要コンポーネント
 
-- `src/App.tsx`: 動画選択、状態管理、再生トリガー、撮影モード、設定保存、ログ表示
+- `src/App.tsx`: 動画選択、状態管理、再生トリガー、撮影モード、PCスペック目安、設定保存、ログ表示
 - `src/services/voiceTrigger.ts`: Vosk優先、Web Speech APIフォールバックの音声トリガーサービス
 - `public/sw.js`: アプリ本体とVoskモデルキャッシュのService Worker
 - `public/manifest.webmanifest`: PWAインストール用Manifest
@@ -144,6 +144,7 @@ Workflowでは次の処理を行います。
 - [x] 待機中表示の黒背景/動画の最初の画面切り替え
 - [x] 遅延カウントの表示/非表示
 - [x] 簡易ログ
+- [x] PCスペック目安と注意表示
 - [x] localStorage設定保存
 
 ### Phase 2: PWA化
