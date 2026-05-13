@@ -132,3 +132,4 @@ ChromeやEdgeなどの対応ブラウザでは、アドレスバー付近のイ�
 
 - Version: v0.1.0
 - Developer: 五味 [@GomiHgy](https://x.com/GomiHgy)
+- Contact: Twitter DM または [gomihgy@edelworks.jp](mailto:gomihgy@edelworks.jp)

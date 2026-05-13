@@ -839,6 +839,20 @@ video {
   font-weight: 800;
 }
 
+.contactNote {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 8px;
+  width: min(760px, 100%);
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(123, 216, 143, 0.28);
+  border-radius: var(--radius);
+  background: rgba(123, 216, 143, 0.07);
+  color: var(--text);
+}
+
 .licensePanel {
   width: min(760px, 100%);
   padding: 12px 14px;

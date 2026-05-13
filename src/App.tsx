@@ -1479,6 +1479,18 @@ function App() {
           </span>
         </div>
 
+        <p className="contactNote">
+          ご連絡は
+          <a href="https://x.com/GomiHgy" target="_blank" rel="noreferrer" title="XのDMで連絡します。">
+            Twitter DM
+          </a>
+          または
+          <a href="mailto:gomihgy@edelworks.jp" title="メールソフトを開きます。">
+            gomihgy@edelworks.jp
+          </a>
+          まで
+        </p>
+
         <details className="licensePanel" title="このアプリで使用している主なライブラリ、音声認識モデル、ライセンスを表示します。">
           <summary>使用技術・ライセンス</summary>
           <p>
